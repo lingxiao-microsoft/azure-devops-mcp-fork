@@ -169,6 +169,64 @@ After the update, provide a summary showing:
       };
     }
   );
+
+  server.prompt(
+    "update_feature_switch_bulk",
+    "Updates multiple stages of an existing feature switch in one operation. Can enable/disable multiple stages or add tenant IDs and rollout requirements to multiple stages.",
+    { 
+      featureName: z.string().describe("The name of the feature switch to update"),
+      stages: z.string().describe("Comma-separated list of deployment stages to update (e.g., 'onebox,test,cst')"),
+      action: z.enum(["enable", "disable", "tenant_rollout"]).describe("Action to perform: 'enable' (set Enabled: true), 'disable' (set Enabled: false), or 'tenant_rollout' (add tenant/rollout requirements)"),
+      tenantIds: z.string().optional().describe("For tenant_rollout action: comma-separated list of tenant IDs to enable for these stages"),
+      rolloutName: z.string().optional().describe("For tenant_rollout action: optional rollout name (e.g., 'daily') to add as a requirement"),
+      branchName: z.string().optional().describe("The branch name (if not provided, will use feature branch naming convention)")
+    },
+    ({ featureName, stages, action, tenantIds, rolloutName, branchName }) => {
+      const stageArray = stages ? stages.split(',').map(stage => stage.trim()) : [];
+      const tenantIdArray = tenantIds ? tenantIds.split(',').map(id => id.trim()) : [];
+      const defaultBranch = featureName ? `feature/${featureName.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : 'feature/unknown';
+      
+      return {
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: String.raw`
+# Task: Bulk Update Feature Switch for Multiple Deployment Stages
+
+Update the feature switch "${featureName || 'unknown'}" for multiple deployment stages in one operation.
+
+## Requirements:
+1. **Use the FeatureManagement repository** (ID: 51df274b-92a1-4411-94fe-c39f70a45b86)
+2. **Target branch**: ${branchName || defaultBranch}
+3. **Deployment stages**: ${stageArray.join(', ')}
+4. **Action**: ${action}${action === 'tenant_rollout' && tenantIdArray.length > 0 ? `\n5. **Tenant IDs**: ${tenantIdArray.join(', ')}` : ''}${action === 'tenant_rollout' && rolloutName ? `\n6. **Rollout name**: ${rolloutName}` : ''}
+
+## Configuration Rules:
+${action === 'enable' ? '- **Enable action**: Set "Enabled": true for all specified stages' : ''}${action === 'disable' ? '- **Disable action**: Set "Enabled": false for all specified stages' : ''}${action === 'tenant_rollout' ? `- **Tenant/Rollout action**: Add requirements to all specified stages${rolloutName ? `\n  - Add RolloutName requirement: "${rolloutName}"` : ''}${tenantIdArray.length > 0 ? `\n  - Add TenantObjectId requirements: ${tenantIdArray.join(', ')}` : ''}` : ''}
+
+## Tool Usage:
+Use the '${REPO_TOOLS.update_feature_switch_bulk}' tool with the following parameters:
+- repositoryId: "51df274b-92a1-4411-94fe-c39f70a45b86"
+- branchName: "${branchName || defaultBranch}"
+- featureName: "${featureName || 'unknown'}"
+- stages: [${stageArray.map(stage => `{ stage: "${stage}", ${action === 'enable' ? 'enabled: true' : action === 'disable' ? 'enabled: false' : `tenantIds: [${tenantIdArray.map(id => `"${id}"`).join(', ')}]${rolloutName ? `, rolloutName: "${rolloutName}"` : ''}`} }`).join(', ')}]
+
+## Expected Result:
+All ${stageArray.length} stage(s) will be updated with the ${action} configuration in a single commit.
+
+After the update, provide a summary showing:
+- The number of stages updated
+- The configuration applied to each stage
+- The commit ID
+- Success confirmation for the bulk operation`,
+            },
+          },
+        ],
+      };
+    }
+  );
 }
 
 export { configurePrompts };

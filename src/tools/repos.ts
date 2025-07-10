@@ -33,6 +33,7 @@ const REPO_TOOLS = {
   create_file: "repo_create_file",
   create_feature_switch: "repo_create_feature_switch",
   update_feature_switch: "repo_update_feature_switch",
+  update_feature_switch_bulk: "repo_update_feature_switch_bulk",
 };
 
 function branchesFilterOutIrrelevantProperties(
@@ -945,6 +946,253 @@ function configureRepoTools(
             featureName,
             stage,
             tenantIds,
+          }, null, 2) }],
+        };
+      }
+    }
+  );
+
+  server.tool(
+    REPO_TOOLS.update_feature_switch_bulk,
+    "Update multiple stages of a feature switch JSON file in one operation. Can enable/disable multiple stages or add tenant IDs and rollout requirements to multiple stages.",
+    {
+      repositoryId: z.string().describe("The ID of the repository where the feature switch is located."),
+      branchName: z.string().describe("The name of the branch where the feature switch exists."),
+      featureName: z.string().describe("The name/ID of the feature switch to update."),
+      stages: z.array(z.object({
+        stage: z.string().describe("The deployment stage to update (e.g., 'test', 'prod', 'onebox')."),
+        tenantIds: z.array(z.string()).optional().describe("Optional list of tenant IDs to be added as requirements for this stage."),
+        rolloutName: z.string().optional().describe("Optional rollout name (e.g., 'daily') to add as a requirement for this stage."),
+        enabled: z.boolean().optional().default(true).describe("Whether to enable (true) or disable (false) the feature for this stage. Only used when no tenantIds or rolloutName are provided."),
+      })).describe("Array of stage configurations to update. Each stage can have different settings."),
+      commitMessage: z.string().optional().describe("The commit message for the update. Optional."),
+    },
+    async ({ repositoryId, branchName, featureName, stages, commitMessage }) => {
+      const connection = await connectionProvider();
+      const gitApi = await connection.getGitApi();
+      
+      try {
+        // Get the current branch to obtain the latest commit ID
+        const branch = await gitApi.getBranch(repositoryId, branchName);
+        const latestCommitId = branch.commit?.commitId;
+
+        if (!latestCommitId) {
+          throw new Error(`Could not find latest commit for branch ${branchName}`);
+        }
+
+        // Construct the file path
+        const filePath = `Features/Configuration/Features/${featureName}.json`;
+
+        // Get the current file content using getItemContent
+        console.log(`Attempting to retrieve file: ${filePath} from branch: ${branchName}`);
+        
+        let fileContent: string | undefined;
+        
+        try {
+          console.log(`Getting file content using getItemContent API`);
+          const contentStream = await gitApi.getItemContent(
+            repositoryId,
+            filePath,
+            undefined, // projectId
+            undefined, // scopePath
+            undefined, // recursionLevel
+            false, // includeContentMetadata
+            false, // latestProcessedChange
+            false, // download
+            {
+              versionType: 0, // 0 = Branch, 1 = Tag, 2 = Commit
+              version: branchName,
+            },
+            true, // includeContent
+            false, // resolveLfs
+            false  // sanitize
+          );
+          
+          console.log(`Got content stream:`, !!contentStream);
+          
+          if (contentStream) {
+            // Convert Node.js ReadableStream to string
+            const chunks: any[] = [];
+            
+            contentStream.on('data', (chunk) => {
+              chunks.push(chunk);
+            });
+            
+            fileContent = await new Promise<string>((resolve, reject) => {
+              contentStream.on('end', () => {
+                const buffer = Buffer.concat(chunks);
+                resolve(buffer.toString('utf-8'));
+              });
+              
+              contentStream.on('error', (error) => {
+                reject(error);
+              });
+            });
+            
+            console.log(`Successfully got file content, length: ${fileContent.length}`);
+            console.log(`File content preview (first 200 chars):`, fileContent.substring(0, 200));
+          } else {
+            throw new Error('No content stream returned');
+          }
+        } catch (error: any) {
+          console.log(`getItemContent failed, trying fallback method:`, error?.message || error);
+          
+          // Fallback: Try using direct REST API call
+          try {
+            const token = await tokenProvider();
+            const itemsUrl = `https://dev.azure.com/powerbi/_apis/git/repositories/${repositoryId}/items?path=${encodeURIComponent(filePath)}&versionType=Branch&version=${encodeURIComponent(branchName)}&includeContent=true&api-version=7.2-preview.1`;
+            
+            const response = await fetch(itemsUrl, {
+              headers: {
+                'Authorization': `Bearer ${token.token}`,
+                'User-Agent': 'AzureDevOpsMCP/1.0',
+                'Accept': 'application/json'
+              }
+            });
+            
+            console.log(`REST API response status: ${response.status} ${response.statusText}`);
+            
+            if (response.ok) {
+              const data = await response.json();
+              fileContent = data.content;
+              console.log(`Fallback method result - Has content:`, !!fileContent, `Content length:`, fileContent?.length || 0);
+            } else {
+              const errorText = await response.text();
+              console.log(`REST API failed - HTTP ${response.status}: ${response.statusText}. Error: ${errorText}`);
+              throw new Error(`Could not retrieve file via REST API: ${response.status} ${response.statusText}`);
+            }
+          } catch (fallbackError: any) {
+            console.log(`Fallback method also failed:`, fallbackError?.message || fallbackError);
+            throw new Error(`Could not find file: ${filePath} on branch: ${branchName}. Error: ${error?.message || error}`);
+          }
+        }
+
+        if (!fileContent) {
+          throw new Error(`Could not find feature switch file content: ${filePath}`);
+        }
+
+        // Parse the current JSON
+        const currentConfig = JSON.parse(fileContent);
+        
+        console.log(`Current config structure:`, JSON.stringify(currentConfig, null, 2));
+
+        // Ensure the Environments object exists
+        if (!currentConfig.Environments) {
+          throw new Error(`'Environments' section not found in feature switch configuration`);
+        }
+
+        const updatedStages: any = {};
+        const availableStages = Object.keys(currentConfig.Environments);
+
+        // Process each stage update
+        for (const stageConfig of stages) {
+          const { stage, tenantIds, rolloutName, enabled } = stageConfig;
+          
+          // Validate that the stage exists
+          if (!currentConfig.Environments.hasOwnProperty(stage)) {
+            throw new Error(`Stage '${stage}' not found in Environments section. Available stages: ${availableStages.join(', ')}`);
+          }
+
+          // Check if this is a simple enable/disable request (no rollout or tenant requirements)
+          const hasRequirements = rolloutName || (tenantIds && tenantIds.length > 0);
+          
+          if (!hasRequirements) {
+            // Simple enable/disable request - set Enabled: true/false
+            currentConfig.Environments[stage] = {
+              Enabled: enabled
+            };
+            updatedStages[stage] = { Enabled: enabled };
+          } else {
+            // Complex requirements - use Requires array
+            const requires = [];
+
+            // Add RolloutName requirement if provided by user
+            if (rolloutName) {
+              requires.push({
+                "Name": "PowerBI.MemberOf",
+                "Parameters": {
+                  "Pivot": "RolloutName",
+                  "Values": [rolloutName]
+                }
+              });
+            }
+
+            // Add tenant ID requirements
+            if (tenantIds && tenantIds.length > 0) {
+              requires.push({
+                "Name": "PowerBI.MemberOf",
+                "Parameters": {
+                  "Pivot": "TenantObjectId",
+                  "Values": tenantIds
+                }
+              });
+            }
+
+            // Update the stage configuration under Environments with requirements
+            currentConfig.Environments[stage] = {
+              Requires: requires
+            };
+            updatedStages[stage] = { Requires: requires };
+          }
+        }
+
+        // Convert back to JSON string with proper formatting
+        const updatedContent = JSON.stringify(currentConfig, null, 2);
+
+        // Create a descriptive commit message if none provided
+        const defaultCommitMessage = `Update feature switch ${featureName} for stages: ${stages.map(s => s.stage).join(', ')}`;
+
+        // Create the push with the updated file
+        const push = {
+          refUpdates: [
+            {
+              name: `refs/heads/${branchName}`,
+              oldObjectId: latestCommitId,
+            },
+          ],
+          commits: [
+            {
+              comment: commitMessage || defaultCommitMessage,
+              changes: [
+                {
+                  changeType: VersionControlChangeType.Edit,
+                  item: {
+                    path: `/${filePath}`,
+                  },
+                  newContent: {
+                    content: updatedContent,
+                    contentType: ItemContentType.RawText,
+                  },
+                },
+              ],
+            },
+          ],
+        };
+
+        const result = await gitApi.createPush(push, repositoryId);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify({
+            success: true,
+            message: `Successfully updated feature switch ${featureName} for ${stages.length} stage(s)`,
+            branchName,
+            filePath,
+            commitId: result.commits?.[0]?.commitId,
+            stagesUpdated: stages.map(s => s.stage),
+            updatedStages,
+            totalStagesProcessed: stages.length
+          }, null, 2) }],
+        };
+
+      } catch (error: any) {
+        return {
+          content: [{ type: "text", text: JSON.stringify({
+            success: false,
+            error: error.message,
+            repositoryId,
+            branchName,
+            featureName,
+            stagesRequested: stages.map(s => s.stage),
           }, null, 2) }],
         };
       }
