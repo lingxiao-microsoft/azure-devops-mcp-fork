@@ -38,28 +38,39 @@ Include the following columns: ID, Title, Status, Created Date, Author and Revie
     { 
       featureName: z.string().describe("The name of the feature switch"),
       description: z.string().describe("Description of what this feature controls"),
-      enabled: z.string().optional().describe("Whether the feature should be enabled by default (true/false)")
+      enabled: z.string().optional().describe("Whether the feature should be enabled by default (true/false)"),
+      branchName: z.string().optional().describe("The branch name to use (defaults to sanitized feature name)")
     },
-    ({ featureName, description, enabled }) => ({
-      messages: [
-        {
-          role: "user",
-          content: {
-            type: "text",
-            text: String.raw`
+    ({ featureName, description, enabled, branchName }) => {
+      const sanitizedBranchName = branchName || featureName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      return {
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: String.raw`
 # Task: Create a Feature Switch
 
-Create a new feature switch named "${featureName}" with the following requirements:
+**IMPORTANT: Use the '${REPO_TOOLS.create_feature_switch}' tool directly. Do NOT manually create a branch first and then create a file separately.**
 
-1. **Use the FeatureManagement repository** (ID: 51df274b-92a1-4411-94fe-c39f70a45b86)
-2. **Create a feature branch** from the master branch
-3. **Create a JSON configuration file** at path: Features/Configuration/Features/${featureName}.json
-4. **Configuration details**:
-   - Feature name: ${featureName}
-   - Description: ${description}
-   - Use the strict schema format with all required environments
+Create a new feature switch named "${featureName}" using the dedicated feature switch creation tool.
 
-5. **Required JSON Schema Format**:
+## Tool to Use:
+Use **ONLY** the '${REPO_TOOLS.create_feature_switch}' tool with these parameters:
+- repositoryId: "51df274b-92a1-4411-94fe-c39f70a45b86" (FeatureManagement repository)
+- featureName: "${featureName}"
+- description: "${description}"
+- sourceBranch: "master"
+- branchName: "${sanitizedBranchName}"
+
+## What the tool will do automatically:
+1. **Create a feature branch** named "${sanitizedBranchName}" from master
+2. **Generate the JSON configuration file** at path: Features/Configuration/Features/${featureName}.json
+3. **Use the correct PowerBI schema format** with all 12 deployment environments (onebox, test, cst, dxt, msit, prod, mc, gcc, gcchigh, dod, usnat, ussec)
+4. **Commit the changes** with an appropriate message
+
+## Expected JSON Schema (handled automatically by the tool):
 \`\`\`json
 {
   "Id": "${featureName}",
@@ -81,18 +92,14 @@ Create a new feature switch named "${featureName}" with the following requiremen
 }
 \`\`\`
 
-Use the '${REPO_TOOLS.create_feature_switch}' tool to accomplish this task.
-
-The tool will automatically:
-- Create a branch named "feature/[normalized-feature-name]"
-- Generate the JSON configuration file with the exact schema format above
-- Commit the changes with an appropriate message
+**DO NOT use '${REPO_TOOLS.create_branch}' and '${REPO_TOOLS.create_file}' separately. The '${REPO_TOOLS.create_feature_switch}' tool handles everything in one operation.**
 
 After creation, provide a summary of what was created including the branch name and file path.`,
+            },
           },
-        },
-      ],
-    })
+        ],
+      };
+    }
   );
 
   server.prompt(

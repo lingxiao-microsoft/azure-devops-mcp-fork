@@ -623,13 +623,14 @@ function configureRepoTools(
       featureName: z.string().describe("The name/ID of the feature switch (e.g., 'GraphQL_UseMwcTokenForSsoConnectionForSQLDB')."),
       description: z.string().describe("Description of what this feature switch controls."),
       sourceBranch: z.string().describe("The source branch to create the feature branch from.").default("master"),
+      branchName: z.string().optional().describe("Custom branch name. If not provided, will use 'feature/[normalized-feature-name]' format."),
     },
-    async ({ repositoryId, featureName, description, sourceBranch }) => {
+    async ({ repositoryId, featureName, description, sourceBranch, branchName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
       
-      // Create a branch name for the feature
-      const branchName = `feature/${featureName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+      // Use custom branch name if provided, otherwise use default format
+      const finalBranchName = branchName || `feature/${featureName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
       
       try {
         // Step 1: Create the branch
@@ -641,7 +642,7 @@ function configureRepoTools(
         const sourceCommit = sourceRef[0].objectId;
         
         const newBranchRef: GitRefUpdate = {
-          name: `refs/heads/${branchName}`,
+          name: `refs/heads/${finalBranchName}`,
           oldObjectId: NULL_OBJECT_ID,
           newObjectId: sourceCommit
         };
@@ -692,7 +693,7 @@ function configureRepoTools(
         // Create the push
         const push: GitPush = {
           refUpdates: [{
-            name: `refs/heads/${branchName}`,
+            name: `refs/heads/${finalBranchName}`,
             oldObjectId: sourceCommit
             // Don't specify newObjectId - let the server calculate it from the commit
           }],
@@ -704,7 +705,7 @@ function configureRepoTools(
         return {
           content: [{ 
             type: "text", 
-            text: `Feature switch '${featureName}' created successfully!\n\nBranch: ${branchName}\nFile: ${filePath}\n\nConfiguration:\n${fileContent}\n\nCommit: ${JSON.stringify(result.commits?.[0], null, 2)}` 
+            text: `Feature switch '${featureName}' created successfully!\n\nBranch: ${finalBranchName}\nFile: ${filePath}\n\nConfiguration:\n${fileContent}\n\nCommit: ${JSON.stringify(result.commits?.[0], null, 2)}` 
           }],
         };
         
