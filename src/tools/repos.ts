@@ -25,7 +25,7 @@ const REPO_TOOLS = {
   get_repo_by_name_or_id: "repo_get_repo_by_name_or_id",
   get_branch_by_name: "repo_get_branch_by_name",
   get_pull_request_by_id: "repo_get_pull_request_by_id",
-  create_pull_request: "repo_create_pull_request",  
+  create_pull_request: "repo_create_pull_request",
   update_pull_request_status: "repo_update_pull_request_status",
   reply_to_comment: "repo_reply_to_comment",
   resolve_comment: "repo_resolve_comment",
@@ -52,7 +52,7 @@ function configureRepoTools(
   tokenProvider: () => Promise<AccessToken>,
   connectionProvider: () => Promise<WebApi>
 ) {
-  
+
   server.tool(
     REPO_TOOLS.create_pull_request,
     "Create a new pull request.",
@@ -116,13 +116,13 @@ function configureRepoTools(
         ],
       };
     }
-  ); 
- 
+  );
+
   server.tool(
     REPO_TOOLS.list_repos_by_project,
     "Retrieve a list of repositories for a given project",
-    { 
-      project: z.string().describe("The name or ID of the Azure DevOps project."), 
+    {
+      project: z.string().describe("The name or ID of the Azure DevOps project."),
     },
     async ({ project }) => {
       const connection = await connectionProvider();
@@ -152,7 +152,7 @@ function configureRepoTools(
       };
     }
   );
- 
+
   server.tool(
     REPO_TOOLS.list_pull_requests_by_repo,
     "Retrieve a list of pull requests for a given repository.",
@@ -216,7 +216,7 @@ function configureRepoTools(
       };
     }
   );
- 
+
   server.tool(
     REPO_TOOLS.list_pull_requests_by_project,
     "Retrieve a list of pull requests for a given project Id or Name.",
@@ -279,7 +279,7 @@ function configureRepoTools(
       };
     }
   );
-  
+
   server.tool(
     REPO_TOOLS.list_pull_request_threads,
     "Retrieve a list of comment threads for a pull request.",
@@ -313,7 +313,7 @@ function configureRepoTools(
       };
     }
   );
-  
+
   server.tool(
     REPO_TOOLS.list_pull_request_thread_comments,
     "Retrieve a list of comments in a pull request thread.",
@@ -340,7 +340,7 @@ function configureRepoTools(
       };
     }
   );
-  
+
   server.tool(
     REPO_TOOLS.list_branches_by_repo,
     "Retrieve a list of branches for a given repository.",
@@ -403,7 +403,7 @@ function configureRepoTools(
       const repositories = await gitApi.getRepositories(project);
 
       const repository = repositories?.find((repo) => repo.name === repositoryNameOrId || repo.id === repositoryNameOrId);
-      
+
       if (!repository) {
         throw new Error(
           `Repository ${repositoryNameOrId} not found in project ${project}`
@@ -415,13 +415,13 @@ function configureRepoTools(
       };
     }
   );
- 
+
   server.tool(
     REPO_TOOLS.get_branch_by_name,
     "Get a branch by its name.",
-    { 
-      repositoryId: z.string().describe("The ID of the repository where the branch is located."), 
-      branchName: z.string().describe("The name of the branch to retrieve, e.g., 'main' or 'feature-branch'."), 
+    {
+      repositoryId: z.string().describe("The ID of the repository where the branch is located."),
+      branchName: z.string().describe("The name of the branch to retrieve, e.g., 'main' or 'feature-branch'."),
     },
     async ({ repositoryId, branchName }) => {
       const connection = await connectionProvider();
@@ -445,13 +445,13 @@ function configureRepoTools(
       };
     }
   );
- 
+
   server.tool(
     REPO_TOOLS.get_pull_request_by_id,
     "Get a pull request by its ID.",
-    { 
-      repositoryId: z.string().describe("The ID of the repository where the pull request is located."), 
-      pullRequestId: z.number().describe("The ID of the pull request to retrieve."), 
+    {
+      repositoryId: z.string().describe("The ID of the repository where the pull request is located."),
+      pullRequestId: z.number().describe("The ID of the pull request to retrieve."),
     },
     async ({ repositoryId, pullRequestId }) => {
       const connection = await connectionProvider();
@@ -492,7 +492,7 @@ function configureRepoTools(
       };
     }
   );
-  
+
   server.tool(
     REPO_TOOLS.resolve_comment,
     "Resolves a specific comment thread on a pull request.",
@@ -528,28 +528,28 @@ function configureRepoTools(
     async ({ repositoryId, branchName, sourceBranch }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      
+
       // Get the source branch reference
       const sourceRef = await gitApi.getRefs(repositoryId, undefined, `heads/${sourceBranch}`);
       if (!sourceRef || sourceRef.length === 0) {
         throw new Error(`Source branch '${sourceBranch}' not found`);
       }
-      
+
       const sourceCommit = sourceRef[0].objectId;
-      
+
       // Create the new branch
       const newBranchRef: GitRefUpdate = {
         name: `refs/heads/${branchName}`,
         oldObjectId: NULL_OBJECT_ID,
         newObjectId: sourceCommit
       };
-      
+
       const result = await gitApi.updateRefs([newBranchRef], repositoryId);
-      
+
       return {
-        content: [{ 
-          type: "text", 
-          text: `Branch '${branchName}' created successfully from '${sourceBranch}'\n${JSON.stringify(result, null, 2)}` 
+        content: [{
+          type: "text",
+          text: `Branch '${branchName}' created successfully from '${sourceBranch}'\n${JSON.stringify(result, null, 2)}`
         }],
       };
     }
@@ -568,15 +568,15 @@ function configureRepoTools(
     async ({ repositoryId, filePath, fileContent, branchName, commitMessage }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      
+
       // Get the branch reference
       const branchRef = await gitApi.getRefs(repositoryId, undefined, `heads/${branchName}`);
       if (!branchRef || branchRef.length === 0) {
         throw new Error(`Branch '${branchName}' not found`);
       }
-      
+
       const branchCommit = branchRef[0].objectId;
-      
+
       // Create the file change
       const change: GitChange = {
         changeType: VersionControlChangeType.Add,
@@ -588,13 +588,13 @@ function configureRepoTools(
           contentType: ItemContentType.RawText
         }
       };
-      
+
       // Create the commit
       const commit: GitCommitRef = {
         comment: commitMessage,
         changes: [change]
       };
-      
+
       // Create the push
       const push: GitPush = {
         refUpdates: [{
@@ -604,13 +604,13 @@ function configureRepoTools(
         }],
         commits: [commit]
       };
-      
+
       const result = await gitApi.createPush(push, repositoryId);
-      
+
       return {
-        content: [{ 
-          type: "text", 
-          text: `File '${filePath}' created successfully on branch '${branchName}'\n${JSON.stringify(result, null, 2)}` 
+        content: [{
+          type: "text",
+          text: `File '${filePath}' created successfully on branch '${branchName}'\n${JSON.stringify(result, null, 2)}`
         }],
       };
     }
@@ -629,27 +629,27 @@ function configureRepoTools(
     async ({ repositoryId, featureName, description, sourceBranch, branchName }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      
+
       // Use custom branch name if provided, otherwise use default format
       const finalBranchName = branchName || `feature/${featureName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-      
+
       try {
         // Step 1: Create the branch
         const sourceRef = await gitApi.getRefs(repositoryId, undefined, `heads/${sourceBranch}`);
         if (!sourceRef || sourceRef.length === 0) {
           throw new Error(`Source branch '${sourceBranch}' not found`);
         }
-        
+
         const sourceCommit = sourceRef[0].objectId;
-        
+
         const newBranchRef: GitRefUpdate = {
           name: `refs/heads/${finalBranchName}`,
           oldObjectId: NULL_OBJECT_ID,
           newObjectId: sourceCommit
         };
-        
+
         await gitApi.updateRefs([newBranchRef], repositoryId);
-        
+
         // Step 2: Create the feature configuration JSON file
         const filePath = `Features/Configuration/Features/${featureName}.json`;
         const featureConfig = {
@@ -670,9 +670,9 @@ function configureRepoTools(
             "ussec": {}
           }
         };
-        
+
         const fileContent = JSON.stringify(featureConfig, null, 2);
-        
+
         // Create the file change
         const change: GitChange = {
           changeType: VersionControlChangeType.Add,
@@ -684,13 +684,13 @@ function configureRepoTools(
             contentType: ItemContentType.RawText
           }
         };
-        
+
         // Create the commit
         const commit: GitCommitRef = {
           comment: `Add feature switch configuration for ${featureName}`,
           changes: [change]
         };
-        
+
         // Create the push
         const push: GitPush = {
           refUpdates: [{
@@ -700,16 +700,16 @@ function configureRepoTools(
           }],
           commits: [commit]
         };
-        
+
         const result = await gitApi.createPush(push, repositoryId);
-        
+
         return {
-          content: [{ 
-            type: "text", 
-            text: `Feature switch '${featureName}' created successfully!\n\nBranch: ${finalBranchName}\nFile: ${filePath}\n\nConfiguration:\n${fileContent}\n\nCommit: ${JSON.stringify(result.commits?.[0], null, 2)}` 
+          content: [{
+            type: "text",
+            text: `Feature switch '${featureName}' created successfully!\n\nBranch: ${branchName}\nFile: ${filePath}\n\nConfiguration:\n${fileContent}\n\nCommit: ${JSON.stringify(result.commits?.[0], null, 2)}`
           }],
         };
-        
+
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         throw new Error(`Failed to create feature switch: ${errorMessage}`);
@@ -717,240 +717,166 @@ function configureRepoTools(
     }
   );
 
+server.tool(
+  REPO_TOOLS.update_feature_switch,
+  "Update a feature switch JSON file with tenant IDs, rollout requirements, or complex targeting rules per deployment stage.",
+  {
+    repositoryId: z.string().describe("ID of the repository."),
+    branchName: z.string().describe("Branch name."),
+    featureName: z.string().describe("Feature switch name."),
+    stage: z.string().describe("Deployment stage."),
+    enabled: z.boolean().optional().default(true).describe("Enable/disable flag. Used only when no rules are provided."),
+    commitMessage: z.string().optional().describe("Commit message."),
+    rules: z.array(z.object({
+      pivot: z.string().describe("Pivot name (e.g., TenantObjectId, ClusterName, RolloutName)"),
+      values: z.array(z.string()).describe("Values for the pivot (or Value for AtLeastVersion operator)"),
+      operator: z.enum(["MemberOf", "NotMemberOf", "AtLeastVersion"]).default("MemberOf").describe("Comparison type"),
+      targetName: z.string().optional().describe("Optional name of the target block to insert this rule into. If not provided, goes under Requires")
+    })).optional().describe("Targeting or requirement rules (instead of simple enabled flag)"),
+    targets: z.record(z.array(z.object({
+      Name: z.string().describe("PowerBI requirement name (e.g., 'PowerBI.MemberOf', 'PowerBI.NotMemberOf')"),
+      Parameters: z.object({
+        Pivot: z.string().describe("Pivot name (e.g., TenantObjectId, ClusterName, RolloutName)"),
+        Values: z.array(z.string()).optional().describe("Values for the pivot (for MemberOf/NotMemberOf)"),
+        Value: z.string().optional().describe("Single value for the pivot (for AtLeastVersion)")
+      })
+    }))).optional().describe("Complex targets structure with target names as keys and requirement arrays as values")
+  },
+  async ({ repositoryId, branchName, featureName, stage, enabled, commitMessage, rules, targets }) => {
+    const connection = await connectionProvider();
+    const gitApi = await connection.getGitApi();
 
+    try {
+      // Get branch & commit ID
+      const branch = await gitApi.getBranch(repositoryId, branchName);
+      const latestCommitId = branch.commit?.commitId;
+      if (!latestCommitId) throw new Error(`Could not find latest commit for branch ${branchName}`);
 
-  server.tool(
-    REPO_TOOLS.update_feature_switch,
-    "Update a feature switch JSON file to add tenant IDs and rollout requirements for specific deployment stages, or simply enable/disable a stage",
-    {
-      repositoryId: z.string().describe("The ID of the repository where the feature switch is located."),
-      branchName: z.string().describe("The name of the branch where the feature switch exists."),
-      featureName: z.string().describe("The name/ID of the feature switch to update."),
-      stage: z.string().describe("The deployment stage to update (e.g., 'test', 'prod')."),
-      tenantIds: z.array(z.string()).optional().describe("Optional list of tenant IDs to be added as requirements. If not provided, will be a simple enable/disable."),
-      rolloutName: z.string().optional().describe("Optional rollout name (e.g., 'daily') to add as a requirement. If provided, will add RolloutName requirement."),
-      enabled: z.boolean().optional().default(true).describe("Whether to enable (true) or disable (false) the feature for this stage. Only used when no tenantIds or rolloutName are provided."),
-      commitMessage: z.string().optional().describe("The commit message for the update. Optional."),
-    },
-    async ({ repositoryId, branchName, featureName, stage, tenantIds, rolloutName, enabled, commitMessage }) => {
-      const connection = await connectionProvider();
-      const gitApi = await connection.getGitApi();
-      
+      const filePath = `Features/Configuration/Features/${featureName}.json`;
+
+      // Get file content directly using REST API
+      let fileContent: string | undefined;
+
       try {
-        // Get the current branch to obtain the latest commit ID
-        const branch = await gitApi.getBranch(repositoryId, branchName);
-        const latestCommitId = branch.commit?.commitId;
+        const token = await tokenProvider();
+        const itemsUrl = `https://dev.azure.com/powerbi/_apis/git/repositories/${repositoryId}/items?path=${encodeURIComponent(filePath)}&versionType=Branch&version=${encodeURIComponent(branchName)}&includeContent=true&api-version=7.2-preview.1`;
 
-        if (!latestCommitId) {
-          throw new Error(`Could not find latest commit for branch ${branchName}`);
-        }
-
-        // Construct the file path
-        const filePath = `Features/Configuration/Features/${featureName}.json`;
-
-        // Get the current file content using getItemContent
-        console.log(`Attempting to retrieve file: ${filePath} from branch: ${branchName}`);
-        
-        let fileContent: string | undefined;
-        
-        try {
-          console.log(`Getting file content using getItemContent API`);
-          const contentStream = await gitApi.getItemContent(
-            repositoryId,
-            filePath,
-            undefined, // projectId
-            undefined, // scopePath
-            undefined, // recursionLevel
-            false, // includeContentMetadata
-            false, // latestProcessedChange
-            false, // download
-            {
-              versionType: 0, // 0 = Branch, 1 = Tag, 2 = Commit
-              version: branchName,
-            },
-            true, // includeContent
-            false, // resolveLfs
-            false  // sanitize
-          );
-          
-          console.log(`Got content stream:`, !!contentStream);
-          
-          if (contentStream) {
-            // Convert Node.js ReadableStream to string
-            const chunks: any[] = [];
-            
-            contentStream.on('data', (chunk) => {
-              chunks.push(chunk);
-            });
-            
-            fileContent = await new Promise<string>((resolve, reject) => {
-              contentStream.on('end', () => {
-                const buffer = Buffer.concat(chunks);
-                resolve(buffer.toString('utf-8'));
-              });
-              
-              contentStream.on('error', (error) => {
-                reject(error);
-              });
-            });
-            
-            console.log(`Successfully got file content, length: ${fileContent.length}`);
-            console.log(`File content preview (first 200 chars):`, fileContent.substring(0, 200));
-          } else {
-            throw new Error('No content stream returned');
+        const response = await fetch(itemsUrl, {
+          headers: {
+            'Authorization': `Bearer ${token.token}`,
+            'User-Agent': 'AzureDevOpsMCP/1.0',
+            'Accept': 'application/json'
           }
-        } catch (error: any) {
-          console.log(`getItemContent failed, trying fallback method:`, error?.message || error);
-          
-          // Fallback: Try using direct REST API call
-          try {
-            const token = await tokenProvider();
-            const itemsUrl = `https://dev.azure.com/powerbi/_apis/git/repositories/${repositoryId}/items?path=${encodeURIComponent(filePath)}&versionType=Branch&version=${encodeURIComponent(branchName)}&includeContent=true&api-version=7.2-preview.1`;
-            
-            const response = await fetch(itemsUrl, {
-              headers: {
-                'Authorization': `Bearer ${token.token}`,
-                'User-Agent': 'AzureDevOpsMCP/1.0',
-                'Accept': 'application/json'
-              }
-            });
-            
-            console.log(`REST API response status: ${response.status} ${response.statusText}`);
-            
-            if (response.ok) {
-              const data = await response.json();
-              fileContent = data.content;
-              console.log(`Fallback method result - Has content:`, !!fileContent, `Content length:`, fileContent?.length || 0);
-            } else {
-              const errorText = await response.text();
-              console.log(`REST API failed - HTTP ${response.status}: ${response.statusText}. Error: ${errorText}`);
-              throw new Error(`Could not retrieve file via REST API: ${response.status} ${response.statusText}`);
-            }
-          } catch (fallbackError: any) {
-            console.log(`Fallback method also failed:`, fallbackError?.message || fallbackError);
-            throw new Error(`Could not find file: ${filePath} on branch: ${branchName}. Error: ${error?.message || error}`);
-          }
-        }
+        });
 
-        if (!fileContent) {
-          throw new Error(`Could not find feature switch file content: ${filePath}`);
-        }
-
-        // Parse the current JSON
-        const currentConfig = JSON.parse(fileContent);
-        
-        console.log(`Current config structure:`, JSON.stringify(currentConfig, null, 2));
-
-        // Ensure the Environments object exists
-        if (!currentConfig.Environments) {
-          throw new Error(`'Environments' section not found in feature switch configuration`);
-        }
-
-        // Ensure the stage exists under Environments
-        if (!currentConfig.Environments.hasOwnProperty(stage)) {
-          throw new Error(`Stage '${stage}' not found in Environments section. Available stages: ${Object.keys(currentConfig.Environments).join(', ')}`);
-        }
-
-        // Check if this is a simple enable/disable request (no rollout or tenant requirements)
-        const hasRequirements = rolloutName || (tenantIds && tenantIds.length > 0);
-        
-        if (!hasRequirements) {
-          // Simple enable/disable request - set Enabled: true/false
-          currentConfig.Environments[stage] = {
-            Enabled: enabled
-          };
+        if (response.ok) {
+          const data = await response.json();
+          fileContent = data.content;
         } else {
-          // Complex requirements - use Requires array
-          const requires = [];
+          throw new Error(`Could not retrieve file via REST API: ${response.status} ${response.statusText}`);
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Could not find file: ${filePath} on branch: ${branchName}. Error: ${errorMessage}`);
+      }
 
-          // Add RolloutName requirement if provided by user
-          if (rolloutName) {
-            requires.push({
-              "Name": "PowerBI.MemberOf",
-              "Parameters": {
-                "Pivot": "RolloutName",
-                "Values": [rolloutName]
-              }
-            });
-          }
+      if (!fileContent) {
+        throw new Error(`Could not find feature switch file content: ${filePath}`);
+      }
+      const config = JSON.parse(fileContent);
 
-          // Add tenant ID requirements
-          if (tenantIds && tenantIds.length > 0) {
-            requires.push({
-              "Name": "PowerBI.MemberOf",
-              "Parameters": {
-                "Pivot": "TenantObjectId",
-                "Values": tenantIds
-              }
-            });
-          }
+      if (!config.Environments) throw new Error(`'Environments' section not found in feature config`);
+      if (!config.Environments[stage]) throw new Error(`Stage '${stage}' not found in Environments`);
 
-          // Update the stage configuration under Environments with requirements
-          currentConfig.Environments[stage] = {
-            Requires: requires
+      // Build Requires/Targets based on rules or targets
+      if (targets && Object.keys(targets).length > 0) {
+        // Use the provided targets structure directly
+        const stageConfig: Record<string, unknown> = {
+          Targets: targets
+        };
+        config.Environments[stage] = stageConfig;
+      } else if (rules && rules.length > 0) {
+        const requires: Record<string, unknown>[] = [];
+        const targetsFromRules: Record<string, Record<string, unknown>[]> = {};
+
+        for (const rule of rules) {
+          const expr = {
+            Name: `PowerBI.${rule.operator}`,
+            Parameters: {
+              Pivot: rule.pivot,
+              ...(rule.operator === "AtLeastVersion"
+                ? { Value: rule.values[0] }
+                : { Values: rule.values })
+            }
           };
+
+          if (rule.targetName) {
+            if (!targetsFromRules[rule.targetName]) {
+              targetsFromRules[rule.targetName] = [];
+            }
+            targetsFromRules[rule.targetName].push(expr);
+          } else {
+            requires.push(expr);
+          }
         }
 
-        // Convert back to JSON string with proper formatting
-        const updatedContent = JSON.stringify(currentConfig, null, 2);
+        const stageConfig: Record<string, unknown> = {};
+        if (requires.length > 0) stageConfig.Requires = requires;
+        if (Object.keys(targetsFromRules).length > 0) stageConfig.Targets = targetsFromRules;
 
-        // Create the push with the updated file
-        const push = {
-          refUpdates: [
-            {
-              name: `refs/heads/${branchName}`,
-              oldObjectId: latestCommitId,
-            },
-          ],
-          commits: [
-            {
-              comment: commitMessage || `Update feature switch ${featureName} for ${stage} stage with tenant IDs`,
-              changes: [
-                {
-                  changeType: VersionControlChangeType.Edit,
-                  item: {
-                    path: `/${filePath}`,
-                  },
-                  newContent: {
-                    content: updatedContent,
-                    contentType: ItemContentType.RawText,
-                  },
-                },
-              ],
-            },
-          ],
-        };
+        config.Environments[stage] = stageConfig;
+      } else {
+        config.Environments[stage] = { Enabled: enabled };
+      }
 
-        const result = await gitApi.createPush(push, repositoryId);
+      const updatedContent = JSON.stringify(config, null, 2);
 
-        return {
-          content: [{ type: "text", text: JSON.stringify({
+      const push = {
+        refUpdates: [{ name: `refs/heads/${branchName}`, oldObjectId: latestCommitId }],
+        commits: [{
+          comment: commitMessage || `Update feature switch ${featureName} for ${stage} stage`,
+          changes: [{
+            changeType: VersionControlChangeType.Edit,
+            item: { path: `/${filePath}` },
+            newContent: { content: updatedContent, contentType: ItemContentType.RawText }
+          }]
+        }]
+      };
+
+      const result = await gitApi.createPush(push, repositoryId);
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
             success: true,
-            message: `Successfully updated feature switch ${featureName} for ${stage} stage`,
+            message: `Feature switch ${featureName} updated for '${stage}'`,
             branchName,
             filePath,
             commitId: result.commits?.[0]?.commitId,
-            tenantIds,
-            stage,
-            updatedConfig: currentConfig.Environments[stage]
-          }, null, 2) }],
-        };
-
-      } catch (error: any) {
-        return {
-          content: [{ type: "text", text: JSON.stringify({
+            rules,
+            enabled,
+            updatedConfig: config.Environments[stage]
+          }, null, 2)
+        }]
+      };
+    } catch (error: any) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
             success: false,
             error: error.message,
             repositoryId,
             branchName,
             featureName,
             stage,
-            tenantIds,
-          }, null, 2) }],
-        };
-      }
+            rules
+          }, null, 2)
+        }]
+      };
     }
-  );
+  });
 
   server.tool(
     REPO_TOOLS.update_feature_switch_bulk,
@@ -970,7 +896,7 @@ function configureRepoTools(
     async ({ repositoryId, branchName, featureName, stages, commitMessage }) => {
       const connection = await connectionProvider();
       const gitApi = await connection.getGitApi();
-      
+
       try {
         // Get the current branch to obtain the latest commit ID
         const branch = await gitApi.getBranch(repositoryId, branchName);
@@ -985,9 +911,9 @@ function configureRepoTools(
 
         // Get the current file content using getItemContent
         console.log(`Attempting to retrieve file: ${filePath} from branch: ${branchName}`);
-        
+
         let fileContent: string | undefined;
-        
+
         try {
           console.log(`Getting file content using getItemContent API`);
           const contentStream = await gitApi.getItemContent(
@@ -1002,33 +928,30 @@ function configureRepoTools(
             {
               versionType: 0, // 0 = Branch, 1 = Tag, 2 = Commit
               version: branchName,
-            },
-            true, // includeContent
-            false, // resolveLfs
-            false  // sanitize
+            }
           );
-          
+
           console.log(`Got content stream:`, !!contentStream);
-          
+
           if (contentStream) {
             // Convert Node.js ReadableStream to string
             const chunks: any[] = [];
-            
+
             contentStream.on('data', (chunk) => {
               chunks.push(chunk);
             });
-            
+
             fileContent = await new Promise<string>((resolve, reject) => {
               contentStream.on('end', () => {
                 const buffer = Buffer.concat(chunks);
                 resolve(buffer.toString('utf-8'));
               });
-              
+
               contentStream.on('error', (error) => {
                 reject(error);
               });
             });
-            
+
             console.log(`Successfully got file content, length: ${fileContent.length}`);
             console.log(`File content preview (first 200 chars):`, fileContent.substring(0, 200));
           } else {
@@ -1036,12 +959,12 @@ function configureRepoTools(
           }
         } catch (error: any) {
           console.log(`getItemContent failed, trying fallback method:`, error?.message || error);
-          
+
           // Fallback: Try using direct REST API call
           try {
             const token = await tokenProvider();
             const itemsUrl = `https://dev.azure.com/powerbi/_apis/git/repositories/${repositoryId}/items?path=${encodeURIComponent(filePath)}&versionType=Branch&version=${encodeURIComponent(branchName)}&includeContent=true&api-version=7.2-preview.1`;
-            
+
             const response = await fetch(itemsUrl, {
               headers: {
                 'Authorization': `Bearer ${token.token}`,
@@ -1049,9 +972,9 @@ function configureRepoTools(
                 'Accept': 'application/json'
               }
             });
-            
+
             console.log(`REST API response status: ${response.status} ${response.statusText}`);
-            
+
             if (response.ok) {
               const data = await response.json();
               fileContent = data.content;
@@ -1073,7 +996,7 @@ function configureRepoTools(
 
         // Parse the current JSON
         const currentConfig = JSON.parse(fileContent);
-        
+
         console.log(`Current config structure:`, JSON.stringify(currentConfig, null, 2));
 
         // Ensure the Environments object exists
@@ -1087,7 +1010,7 @@ function configureRepoTools(
         // Process each stage update
         for (const stageConfig of stages) {
           const { stage, tenantIds, rolloutName, enabled } = stageConfig;
-          
+
           // Validate that the stage exists
           if (!currentConfig.Environments.hasOwnProperty(stage)) {
             throw new Error(`Stage '${stage}' not found in Environments section. Available stages: ${availableStages.join(', ')}`);
@@ -1095,7 +1018,7 @@ function configureRepoTools(
 
           // Check if this is a simple enable/disable request (no rollout or tenant requirements)
           const hasRequirements = rolloutName || (tenantIds && tenantIds.length > 0);
-          
+
           if (!hasRequirements) {
             // Simple enable/disable request - set Enabled: true/false
             currentConfig.Environments[stage] = {
@@ -1204,9 +1127,9 @@ function configureRepoTools(
 function debugLog(message: string, data?: any) {
   const timestamp = new Date().toISOString();
   const logMessage = `[${timestamp}] ${message}${data ? ': ' + JSON.stringify(data) : ''}`;
-  
+
   console.log(logMessage);
-  
+
   // Also write to a log file
   try {
     const logDir = path.join(process.cwd(), 'logs');

@@ -35,7 +35,7 @@ Include the following columns: ID, Title, Status, Created Date, Author and Revie
   server.prompt(
     "create_feature_switch",
     "Creates a new feature switch by creating a branch and JSON configuration file.",
-    { 
+    {
       featureName: z.string().describe("The name of the feature switch"),
       description: z.string().describe("Description of what this feature controls"),
       enabled: z.string().optional().describe("Whether the feature should be enabled by default (true/false)"),
@@ -102,78 +102,69 @@ After creation, provide a summary of what was created including the branch name 
     }
   );
 
-  server.prompt(
-    "update_feature_switch",
-    "Updates an existing feature switch to add tenant IDs and rollout requirements for specific deployment stages.",
-    { 
-      featureName: z.string().describe("The name of the feature switch to update"),
-      stage: z.string().describe("The deployment stage (e.g., 'test', 'onebox', 'dxt', 'msit', 'prod')"),
-      tenantIds: z.string().describe("Comma-separated list of tenant IDs to enable for this stage"),
-      rolloutName: z.string().optional().describe("Optional rollout name (e.g., 'daily') to add as a requirement"),
-      branchName: z.string().optional().describe("The branch name (if not provided, will use feature branch naming convention)")
-    },
-    ({ featureName, stage, tenantIds, rolloutName, branchName }) => {
-      const tenantIdArray = tenantIds ? tenantIds.split(',').map(id => id.trim()) : [];
-      const defaultBranch = featureName ? `feature/${featureName.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : 'feature/unknown';
-      
-      return {
-        messages: [
-          {
-            role: "user",
-            content: {
-              type: "text",
-              text: String.raw`
-# Task: Update Feature Switch for Deployment Stage
+server.prompt(
+  "update_feature_switch",
+  "Updates a feature switch using rollout name, tenant IDs, or targets for a specific stage using MemberOf or NotMemberOf logic.",
+  {
+    featureName: z.string().describe("Name of the feature switch."),
+    stage: z.string().describe("Stage to update (e.g., test, msit, prod)."),
+    rolloutName: z.string().optional().describe("Rollout name like 'daily'."),
+    tenantIds: z.string().optional().describe("Comma-separated tenant IDs."),
+    isMember: z.string().optional().describe("false for NotMemberOf, true (or empty) for MemberOf."),
+    branchName: z.string().optional().describe("Branch name (optional)."),
+  },
+  ({ featureName, stage, rolloutName, tenantIds, isMember, branchName }) => {
+    const tenantIdArray = tenantIds ? tenantIds.split(',').map(id => id.trim()) : [];
+    const defaultBranch = featureName
+      ? `feature/${featureName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
+      : 'feature/unknown';
+    const memberOperator = isMember === 'false' ? 'NotMemberOf' : 'MemberOf';
 
-Update the feature switch "${featureName || 'unknown'}" to enable it for specific tenant IDs in the "${stage || 'unknown'}" deployment stage.
+    const rules = [];
 
-## Requirements:
-1. **Use the FeatureManagement repository** (ID: 51df274b-92a1-4411-94fe-c39f70a45b86)
-2. **Target branch**: ${branchName || defaultBranch}
-3. **Deployment stage**: ${stage || 'unknown'}
-4. **Tenant IDs to enable**: ${tenantIdArray.join(', ')}${rolloutName ? `\n5. **Rollout name**: ${rolloutName}` : ''}
-
-## Configuration Rules:
-- **If rolloutName is provided**: Add RolloutName requirement with the specified value
-- **Always**: Add TenantObjectId requirements for the specified tenant IDs
-- **File path**: Features/Configuration/Features/${featureName || 'unknown'}.json
-
-## Expected JSON Structure:
-For the "${stage || 'unknown'}" stage, the configuration should follow the PowerBI feature switch schema:
-\`\`\`json
-"Environments": {
-  "${stage || 'unknown'}": {
-    "Requires": [
-      ${rolloutName ? `{\n        "Name": "PowerBI.MemberOf",\n        "Parameters": {\n          "Pivot": "RolloutName",\n          "Values": ["${rolloutName}"]\n        }\n      },` : ''}
-      {
-        "Name": "PowerBI.MemberOf", 
-        "Parameters": {
-          "Pivot": "TenantObjectId",
-          "Values": [${tenantIdArray.map(id => `"${id}"`).join(', ')}]
-        }
-      }
-    ]
-  }
-}
-\`\`\`
-
-Use the '${REPO_TOOLS.update_feature_switch}' tool to accomplish this task.
-
-After the update, provide a summary showing:
-- The updated configuration for the ${stage || 'unknown'} stage
-- The commit ID
-- The tenant IDs that were added${rolloutName ? `\n- The rollout name: ${rolloutName}` : ''}`,
-            },
-          },
-        ],
-      };
+    if (rolloutName) {
+      rules.push({
+        pivot: "RolloutName",
+        values: [rolloutName],
+        operator: memberOperator
+      });
     }
-  );
 
-  server.prompt(
+    if (tenantIdArray.length > 0) {
+      rules.push({
+        pivot: "TenantObjectId",
+        values: tenantIdArray,
+        operator: memberOperator
+      });
+    }
+
+    return {
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: JSON.stringify({
+              tool: "update_feature_switch",
+              args: {
+                repositoryId: "51df274b-92a1-4411-94fe-c39f70a45b86",
+                branchName: branchName || defaultBranch,
+                featureName,
+                stage,
+                rules: rules.length > 0 ? rules : undefined
+              }
+            }, null, 2)
+          }
+        }
+      ]
+    };
+  }
+);
+
+server.prompt(
     "update_feature_switch_bulk",
     "Updates multiple stages of an existing feature switch in one operation. Can enable/disable multiple stages or add tenant IDs and rollout requirements to multiple stages.",
-    { 
+    {
       featureName: z.string().describe("The name of the feature switch to update"),
       stages: z.string().describe("Comma-separated list of deployment stages to update (e.g., 'onebox,test,cst')"),
       action: z.enum(["enable", "disable", "tenant_rollout"]).describe("Action to perform: 'enable' (set Enabled: true), 'disable' (set Enabled: false), or 'tenant_rollout' (add tenant/rollout requirements)"),
@@ -185,7 +176,7 @@ After the update, provide a summary showing:
       const stageArray = stages ? stages.split(',').map(stage => stage.trim()) : [];
       const tenantIdArray = tenantIds ? tenantIds.split(',').map(id => id.trim()) : [];
       const defaultBranch = featureName ? `feature/${featureName.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : 'feature/unknown';
-      
+
       return {
         messages: [
           {
