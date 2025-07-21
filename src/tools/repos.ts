@@ -14,6 +14,20 @@ import path from 'path';
 // Standard Git null object ID (40 zeros) - not a secret, used for Git operations
 const NULL_OBJECT_ID = "0".repeat(40);
 
+// Helper function to strip JavaScript-style comments from JSON
+function stripJsonComments(jsonString: string): string {
+  // Remove single-line comments (// ...)
+  let result = jsonString.replace(/\/\/.*$/gm, '');
+  
+  // Remove multi-line comments (/* ... */)
+  result = result.replace(/\/\*[\s\S]*?\*\//g, '');
+  
+  // Clean up any trailing commas that might be left after comment removal
+  result = result.replace(/,(\s*[}\]])/g, '$1');
+  
+  return result;
+}
+
 const REPO_TOOLS = {
   list_repos_by_project: "repo_list_repos_by_project",
   list_pull_requests_by_repo: "repo_list_pull_requests_by_repo",
@@ -783,7 +797,10 @@ server.tool(
       if (!fileContent) {
         throw new Error(`Could not find feature switch file content: ${filePath}`);
       }
-      const config = JSON.parse(fileContent);
+
+      // Strip comments before parsing JSON
+      const cleanedContent = stripJsonComments(fileContent);
+      const config = JSON.parse(cleanedContent);
 
       if (!config.Environments) throw new Error(`'Environments' section not found in feature config`);
       if (!config.Environments[stage]) throw new Error(`Stage '${stage}' not found in Environments`);
@@ -994,8 +1011,9 @@ server.tool(
           throw new Error(`Could not find feature switch file content: ${filePath}`);
         }
 
-        // Parse the current JSON
-        const currentConfig = JSON.parse(fileContent);
+        // Parse the current JSON (strip comments first)
+        const cleanedContent = stripJsonComments(fileContent);
+        const currentConfig = JSON.parse(cleanedContent);
 
         console.log(`Current config structure:`, JSON.stringify(currentConfig, null, 2));
 
